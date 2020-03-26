@@ -18,25 +18,56 @@ enum Msg {
     Action(usize),
 }
 
+enum Layout {
+    Box(gtk::Box),
+    Grid(gtk::Grid),
+}
+
 fn setup_gui(tx: mpsc::Sender<Msg>, config: &Config, app: &Application) {
     let window = ApplicationWindow::new(app);
     window.set_title(&config.title);
     window.set_default_size(350, 70);
 
-    let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    let layout = match config.layout {
+        ConfigLayout::Vertical { spacing } => Layout::Box(gtk::Box::new(
+            gtk::Orientation::Vertical,
+            spacing.unwrap_or(0),
+        )),
+        ConfigLayout::Horizontal { spacing } => Layout::Box(gtk::Box::new(
+            gtk::Orientation::Horizontal,
+            spacing.unwrap_or(0),
+        )),
+        ConfigLayout::Grid => Layout::Grid(gtk::Grid::new()),
+    };
     for (i, node) in config.nodes.iter().enumerate() {
-        match node {
+        let (n, p) = match node {
             Node::Button(btn) => {
                 let button = Button::new_with_label(&btn.text);
                 let tx = tx.clone();
                 button.connect_clicked(move |_| {
                     tx.send(Msg::Action(i)).unwrap();
                 });
-                v_box.pack_start(&button, false, false, 0);
+                (button.upcast::<gtk::Widget>(), &btn.placement)
             }
-        }
+        };
+        match &layout {
+            Layout::Box(container) => {
+                container.pack_start(&n, false, false, p.spacing.unwrap_or(0))
+            }
+            Layout::Grid(container) => container.attach(
+                &n,
+                p.x.unwrap_or(0),
+                p.y.unwrap_or(0),
+                p.w.unwrap_or(1),
+                p.h.unwrap_or(1),
+            ),
+        };
     }
-    window.add(&v_box);
+
+    match layout {
+        Layout::Box(container) => window.add(&container.upcast::<gtk::Widget>()),
+        Layout::Grid(container) => window.add(&container.upcast::<gtk::Widget>()),
+    };
 
     window.show_all();
 }
