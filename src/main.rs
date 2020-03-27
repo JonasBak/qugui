@@ -29,6 +29,7 @@ enum MsgHandler {
 #[derive(Debug)]
 enum MsgGui {
     Show(String, String),
+    Options(String, String, Vec<(String, String)>),
 }
 
 enum Layout {
@@ -139,8 +140,8 @@ fn setup_gui(
     grx.attach(None, move |msg| {
         debug!("handler->gui: {:?}", msg);
         match msg {
-            MsgGui::Show(name, text) => {
-                if let Some(container) = containers.get(&name) {
+            MsgGui::Show(container, text) => {
+                if let Some(container) = containers.get(&container) {
                     container
                         .get_children()
                         .iter()
@@ -149,7 +150,24 @@ fn setup_gui(
                     container.add(&label);
                     container.show_all();
                 } else {
-                    warn!("could not find container with name {}", name);
+                    warn!("could not find container with name {}", container);
+                }
+            }
+            MsgGui::Options(container, variable, options) => {
+                if let Some(container) = containers.get(&container) {
+                    container
+                        .get_children()
+                        .iter()
+                        .for_each(|w| container.remove(w));
+                    let buttons = create_radio_buttons(
+                        options.iter().map(|(a, b)| (a, b)).collect(),
+                        variable,
+                        tx.clone(),
+                    );
+                    container.add(&buttons);
+                    container.show_all();
+                } else {
+                    warn!("could not find container with name {}", container);
                 }
             }
         }
@@ -220,6 +238,24 @@ fn handle_msg(
                         env::set_var(name, string);
                     } else {
                         warn!("can't show output, no stdout saved");
+                    }
+                }
+                Action::Options {
+                    variable,
+                    container,
+                } => {
+                    if let Some(mut stdout) = last_out.take() {
+                        let mut string = String::new();
+                        stdout.read_to_string(&mut string).unwrap();
+                        let lines = string.lines();
+                        gtx.send(MsgGui::Options(
+                            container.clone(),
+                            variable.to_owned(),
+                            lines.map(|a| (a.to_string(), a.to_string())).collect(),
+                        ))
+                        .unwrap();
+                    } else {
+                        warn!("can't create options, no stdout saved");
                     }
                 }
             }

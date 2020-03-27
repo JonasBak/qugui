@@ -8,6 +8,7 @@ pub enum Action {
     Run { command: Vec<String> },
     Show { container: String },
     Var { name: String, value: Option<String> },
+    Options { variable: String, container: String },
 }
 
 // #[serde(tag = "type")]

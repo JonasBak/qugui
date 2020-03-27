@@ -30,6 +30,18 @@ nodes:
     x: 0
     y: 4
     w: 3
+- type: Button
+  text: List files
+  on_click:
+  - type: Run
+    command: ["git", "ls-files"]
+  - type: Options
+    variable: $FILE$
+    container: container01
+  placement:
+    x: 0
+    y: 5
+    w: 3
 - type: Container
   name: container01
   placement:
