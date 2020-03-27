@@ -103,6 +103,10 @@ fn setup_gui(
         match msg {
             MsgGui::Show(name, text) => {
                 if let Some(container) = containers.get(&name) {
+                    container
+                        .get_children()
+                        .iter()
+                        .for_each(|w| container.remove(w));
                     let label = gtk::Label::new(Some(&text));
                     container.add(&label);
                     container.show_all();
