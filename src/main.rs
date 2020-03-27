@@ -12,6 +12,7 @@ use gio::prelude::*;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Button};
 use std::collections::HashMap;
+use std::env;
 use std::io::prelude::*;
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
@@ -149,10 +150,10 @@ fn handle_msg(config: &Config, msg: MsgHandler, gtx: glib::Sender<MsgGui>) {
                             if let Some(mut stdout) = last_out.take() {
                                 let mut string = String::new();
                                 stdout.read_to_string(&mut string).unwrap();
-                                debug!("Output from command:\n{}", string);
+                                debug!("output from command:\n{}", string);
                                 gtx.send(MsgGui::Show(container.clone(), string)).unwrap();
                             } else {
-                                warn!("cant show output, no stdout saved");
+                                warn!("can't show output, no stdout saved");
                             }
                         }
                     }
@@ -165,7 +166,8 @@ fn handle_msg(config: &Config, msg: MsgHandler, gtx: glib::Sender<MsgGui>) {
 fn main() {
     env_logger::init();
 
-    let config = read_config().expect("could not parse config file");
+    let args: Vec<String> = env::args().collect();
+    let config = read_config(&args[1]).expect("could not parse config file");
 
     let application = Application::new(Some("com.github.jonasbak.qugui"), Default::default())
         .expect("failed to initialize GTK application");

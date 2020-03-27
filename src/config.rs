@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::fs;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type")]
@@ -53,43 +54,13 @@ pub struct Config {
     pub layout: ConfigLayout,
 }
 
-pub fn read_config() -> Result<Config, serde_yaml::Error> {
-    let config: Config = serde_yaml::from_str(
-        r#"
----
-title: Example
-layout:
-  Vertical:
-    spacing: 1
-nodes:
-- type: Button
-  text: Button 1
-  on_click:
-  - type: Run
-    command: ["git", "status", "-s"]
-  - type: Run
-    command: ["grep", "rs$"]
-  - type: Show
-    container: container01
-  placement:
-    spacing: 10
-- type: Button
-  text: Button 2
-  on_click:
-  - type: Run
-    command: ["date"]
-  - type: Show
-    container: container01
-  placement:
-    spacing: 10
-- type: Container
-  name: container01
-  placement:
-    spacing: 10
-    "#,
-    )?;
+pub fn read_config(filename: &String) -> Result<Config, serde_yaml::Error> {
+    debug!("reading config from: {}", filename);
 
-    debug!("Using config:\n{:?}", config);
+    let config: Config =
+        serde_yaml::from_str(&fs::read_to_string(filename).expect("could not read config file"))?;
+
+    debug!("using config:\n{:?}", config);
 
     Ok(config)
 }

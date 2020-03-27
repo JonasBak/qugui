@@ -1,0 +1,36 @@
+---
+title: Example
+layout:
+  Grid:
+nodes:
+- type: Button
+  text: Button 1
+  on_click:
+  - type: Run
+    command: ["git", "status", "-s"]
+  - type: Run
+    command: ["grep", "rs$"]
+  - type: Show
+    container: container01
+  placement:
+    x: 0
+    y: 3
+    w: 3
+- type: Button
+  text: Button 2
+  on_click:
+  - type: Run
+    command: ["date"]
+  - type: Show
+    container: container01
+  placement:
+    x: 0
+    y: 4
+    w: 3
+- type: Container
+  name: container01
+  placement:
+    x: 0
+    y: 0
+    w: 3
+    h: 3
