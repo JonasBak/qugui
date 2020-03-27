@@ -10,7 +10,7 @@ pub mod config;
 
 use gio::prelude::*;
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button};
+use gtk::{Application, ApplicationWindow, Button, RadioButton};
 use std::collections::HashMap;
 use std::env;
 use std::io::prelude::*;
@@ -23,6 +23,7 @@ use config::*;
 #[derive(Debug)]
 enum MsgHandler {
     Action(usize),
+    Var(String, String),
 }
 
 #[derive(Debug)]
@@ -33,6 +34,34 @@ enum MsgGui {
 enum Layout {
     Box(gtk::Box),
     Grid(gtk::Grid),
+}
+
+fn create_radio_buttons(
+    btns: Vec<(&String, &String)>,
+    var: String,
+    tx: mpsc::Sender<MsgHandler>,
+) -> gtk::Widget {
+    let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let mut group: Option<RadioButton> = None;
+    for (value, label) in btns.iter() {
+        let button = RadioButton::new_with_label(label);
+        let tx = tx.clone();
+        let value = value.clone().to_owned();
+        let variable = var.clone();
+        button.connect_toggled(move |btn| {
+            if btn.get_active() {
+                tx.send(MsgHandler::Var(variable.clone(), value.clone()))
+                    .unwrap();
+            }
+        });
+        container.pack_start(&button, false, false, 0);
+        if let Some(group) = group.clone() {
+            button.join_group(Some(&group));
+        } else {
+            group = Some(button.clone());
+        }
+    }
+    container.upcast::<gtk::Widget>()
 }
 
 fn setup_gui(
@@ -72,6 +101,14 @@ fn setup_gui(
                     tx.send(MsgHandler::Action(i)).unwrap();
                 });
                 (button.upcast::<gtk::Widget>(), &btn.placement)
+            }
+            Node::RadioButtons(btns) => {
+                let container = create_radio_buttons(
+                    btns.options.iter().collect(),
+                    btns.variable.clone(),
+                    tx.clone(),
+                );
+                (container, &btns.placement)
             }
             Node::Container(cont) => {
                 let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -132,8 +169,14 @@ fn handle_msg(
     let actions = match msg {
         MsgHandler::Action(i) => match &config.nodes[i] {
             Node::Button(btn) => Some(&btn.on_click),
+            Node::RadioButtons(_) => None,
             Node::Container(_) => None,
         },
+        MsgHandler::Var(var, value) => {
+            vars.insert(var.clone(), value.clone());
+            env::set_var(var, value);
+            None
+        }
     };
     if let Some(actions) = actions {
         let mut last_out = None;

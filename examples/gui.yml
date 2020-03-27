@@ -3,28 +3,27 @@ title: Example
 layout:
   Grid:
 nodes:
-- type: Button
-  text: Button 1
-  on_click:
-  - type: Run
-    command: ["git", "status", "-s"]
-  - type: Run
-    command: ["grep", "rs$"]
-  - type: Show
-    container: container01
+- type: RadioButtons
+  variable: $RADIO_VAR$
+  options:
+    OPTION0: Option 0
+    OPTION1: Option 1
+    OPTION2: Option 2
   placement:
     x: 0
     y: 3
     w: 3
 - type: Button
-  text: Button 2
+  text: Rust diff
   on_click:
   - type: Run
-    command: ["date"]
-  - type: Var
-    name: $SOME_VARIABLE$
+    command: ["git", "status", "-s"]
   - type: Run
-    command: ["echo", "Testing variable substitution: $SOME_VARIABLE$ some more text"]
+    command: ["grep", "rs$"]
+  - type: Var
+    name: $RUST_DIFF$
+  - type: Run
+    command: ["echo", "Rust files with diff:\n$RUST_DIFF$"]
   - type: Show
     container: container01
   placement:

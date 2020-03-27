@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -28,6 +29,13 @@ pub struct ButtonNode {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct RadioButtonsNode {
+    pub variable: String,
+    pub options: HashMap<String, String>,
+    pub placement: Placement,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct ContainerNode {
     pub name: String,
     pub placement: Placement,
@@ -37,6 +45,7 @@ pub struct ContainerNode {
 #[serde(tag = "type")]
 pub enum Node {
     Button(ButtonNode),
+    RadioButtons(RadioButtonsNode),
     Container(ContainerNode),
 }
 
