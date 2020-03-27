@@ -11,15 +11,22 @@ pub mod config;
 use gio::prelude::*;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Button};
-use std::process::Command;
+use std::collections::HashMap;
+use std::io::prelude::*;
+use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
 
 use config::*;
 
 #[derive(Debug)]
-enum Msg {
+enum MsgHandler {
     Action(usize),
+}
+
+#[derive(Debug)]
+enum MsgGui {
+    Show(String, String),
 }
 
 enum Layout {
@@ -27,10 +34,17 @@ enum Layout {
     Grid(gtk::Grid),
 }
 
-fn setup_gui(tx: mpsc::Sender<Msg>, config: &Config, app: &Application) {
+fn setup_gui(
+    tx: mpsc::Sender<MsgHandler>,
+    grx: glib::Receiver<MsgGui>,
+    config: &Config,
+    app: &Application,
+) {
     let window = ApplicationWindow::new(app);
     window.set_title(&config.title);
-    window.set_default_size(350, 70);
+    window.set_default_size(600, 600);
+
+    let mut containers = HashMap::new();
 
     let layout = match config.layout {
         ConfigLayout::Vertical { spacing } => Layout::Box(gtk::Box::new(
@@ -41,7 +55,12 @@ fn setup_gui(tx: mpsc::Sender<Msg>, config: &Config, app: &Application) {
             gtk::Orientation::Horizontal,
             spacing.unwrap_or(0),
         )),
-        ConfigLayout::Grid => Layout::Grid(gtk::Grid::new()),
+        ConfigLayout::Grid => {
+            let grid = gtk::Grid::new();
+            grid.set_row_homogeneous(true);
+            grid.set_column_homogeneous(true);
+            Layout::Grid(grid)
+        }
     };
     for (i, node) in config.nodes.iter().enumerate() {
         let (n, p) = match node {
@@ -49,9 +68,15 @@ fn setup_gui(tx: mpsc::Sender<Msg>, config: &Config, app: &Application) {
                 let button = Button::new_with_label(&btn.text);
                 let tx = tx.clone();
                 button.connect_clicked(move |_| {
-                    tx.send(Msg::Action(i)).unwrap();
+                    tx.send(MsgHandler::Action(i)).unwrap();
                 });
                 (button.upcast::<gtk::Widget>(), &btn.placement)
+            }
+            Node::Container(cont) => {
+                let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                let w = container.clone().upcast::<gtk::Widget>();
+                containers.insert(cont.name.clone(), container);
+                (w, &cont.placement)
             }
         };
         match &layout {
@@ -73,38 +98,61 @@ fn setup_gui(tx: mpsc::Sender<Msg>, config: &Config, app: &Application) {
         Layout::Grid(container) => window.add(&container.upcast::<gtk::Widget>()),
     };
 
+    grx.attach(None, move |msg| {
+        debug!("handler->gui: {:?}", msg);
+        match msg {
+            MsgGui::Show(name, text) => {
+                if let Some(container) = containers.get(&name) {
+                    let label = gtk::Label::new(Some(&text));
+                    container.add(&label);
+                    container.show_all();
+                } else {
+                    warn!("could not find container with name {}", name);
+                }
+            }
+        }
+        glib::Continue(true)
+    });
+
     window.show_all();
 }
 
-fn do_action(action: &Action) {
-    match action {
-        Action::Run { command } => {
-            let output = Command::new(&command[0])
-                .args(command.iter().skip(1))
-                .output()
-                .unwrap();
-            if !output.status.success() {
-                warn!("Command executed with failing error code");
-                return;
-            }
-            debug!("Output from command:");
-            String::from_utf8(output.stdout)
-                .unwrap()
-                .lines()
-                .for_each(|x| debug!("{:?}", x));
-        }
-    }
-}
-
-fn handle_msg(config: &Config, msg: Msg, gtx: glib::Sender<String>) {
+fn handle_msg(config: &Config, msg: MsgHandler, gtx: glib::Sender<MsgGui>) {
     debug!("gui->handler: {:?}", msg);
     match msg {
-        Msg::Action(i) => {
+        MsgHandler::Action(i) => {
             let actions = match &config.nodes[i] {
-                Node::Button(btn) => &btn.on_click,
+                Node::Button(btn) => Some(&btn.on_click),
+                Node::Container(_) => None,
             };
-            for action in actions.iter() {
-                do_action(action);
+            if let Some(actions) = actions {
+                let mut last_out = None;
+                for action in actions.iter() {
+                    match action {
+                        Action::Run { command } => {
+                            let mut child = Command::new(&command[0])
+                                .args(command.iter().skip(1))
+                                .stdin(match last_out.take() {
+                                    Some(child_stdout) => Stdio::from(child_stdout),
+                                    None => Stdio::piped(),
+                                })
+                                .stdout(Stdio::piped())
+                                .spawn()
+                                .unwrap();
+                            last_out = child.stdout.take();
+                        }
+                        Action::Show { container } => {
+                            if let Some(mut stdout) = last_out.take() {
+                                let mut string = String::new();
+                                stdout.read_to_string(&mut string).unwrap();
+                                debug!("Output from command:\n{}", string);
+                                gtx.send(MsgGui::Show(container.clone(), string)).unwrap();
+                            } else {
+                                warn!("cant show output, no stdout saved");
+                            }
+                        }
+                    }
+                }
             }
         }
     };
@@ -115,22 +163,20 @@ fn main() {
 
     let config = read_config().expect("could not parse config file");
 
-    let (tx, rx) = mpsc::channel::<Msg>();
-    let (gtx, grx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
-
-    let config_clone = config.clone();
-    thread::spawn(move || {
-        rx.iter()
-            .for_each(|msg| handle_msg(&config_clone, msg, gtx.clone()));
-    });
-
     let application = Application::new(Some("com.github.jonasbak.qugui"), Default::default())
         .expect("failed to initialize GTK application");
 
-    application.connect_activate(move |app| setup_gui(tx.clone(), &config, app));
-    grx.attach(None, move |text| {
-        debug!("handler->gui: {:?}", text);
-        glib::Continue(true)
+    application.connect_activate(move |app| {
+        let (tx, rx) = mpsc::channel::<MsgHandler>();
+        let (gtx, grx) = glib::MainContext::channel::<MsgGui>(glib::PRIORITY_DEFAULT);
+
+        let config_clone = config.clone();
+        thread::spawn(move || {
+            rx.iter()
+                .for_each(|msg| handle_msg(&config_clone, msg, gtx.clone()));
+        });
+
+        setup_gui(tx.clone(), grx, &config, app);
     });
 
     application.run(&[]);

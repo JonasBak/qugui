@@ -4,6 +4,7 @@ use serde::Deserialize;
 #[serde(tag = "type")]
 pub enum Action {
     Run { command: Vec<String> },
+    Show { container: String },
 }
 
 // #[serde(tag = "type")]
@@ -25,9 +26,16 @@ pub struct ButtonNode {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct ContainerNode {
+    pub name: String,
+    pub placement: Placement,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type")]
 pub enum Node {
     Button(ButtonNode),
+    Container(ContainerNode),
 }
 
 // TODO check "bug" where spacing is left out and program panics
@@ -59,6 +67,10 @@ nodes:
   on_click:
   - type: Run
     command: ["git", "status", "-s"]
+  - type: Run
+    command: ["grep", "rs$"]
+  - type: Show
+    container: container01
   placement:
     spacing: 10
 - type: Button
@@ -66,6 +78,12 @@ nodes:
   on_click:
   - type: Run
     command: ["date"]
+  - type: Show
+    container: container01
+  placement:
+    spacing: 10
+- type: Container
+  name: container01
   placement:
     spacing: 10
     "#,
