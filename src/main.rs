@@ -1,6 +1,10 @@
 extern crate gio;
+extern crate glib;
 extern crate gtk;
 extern crate serde;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 pub mod config;
 
@@ -80,19 +84,20 @@ fn do_action(action: &Action) {
                 .output()
                 .unwrap();
             if !output.status.success() {
-                println!("Command executed with failing error code");
+                warn!("Command executed with failing error code");
                 return;
             }
+            debug!("Output from command:");
             String::from_utf8(output.stdout)
                 .unwrap()
                 .lines()
-                .for_each(|x| println!("{:?}", x));
+                .for_each(|x| debug!("{:?}", x));
         }
     }
 }
 
-fn handle_msg(config: &Config, msg: Msg) {
-    println!("{:?}", msg);
+fn handle_msg(config: &Config, msg: Msg, gtx: glib::Sender<String>) {
+    debug!("gui->handler: {:?}", msg);
     match msg {
         Msg::Action(i) => {
             let actions = match &config.nodes[i] {
@@ -106,16 +111,27 @@ fn handle_msg(config: &Config, msg: Msg) {
 }
 
 fn main() {
+    env_logger::init();
+
     let config = read_config().expect("could not parse config file");
 
     let (tx, rx) = mpsc::channel::<Msg>();
+    let (gtx, grx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
 
     let config_clone = config.clone();
     thread::spawn(move || {
-        let application = Application::new(Some("com.github.jonasbak.qugui"), Default::default())
-            .expect("failed to initialize GTK application");
-        application.connect_activate(move |app| setup_gui(tx.clone(), &config_clone, app));
-        application.run(&[]);
+        rx.iter()
+            .for_each(|msg| handle_msg(&config_clone, msg, gtx.clone()));
     });
-    rx.iter().for_each(|msg| handle_msg(&config, msg));
+
+    let application = Application::new(Some("com.github.jonasbak.qugui"), Default::default())
+        .expect("failed to initialize GTK application");
+
+    application.connect_activate(move |app| setup_gui(tx.clone(), &config, app));
+    grx.attach(None, move |text| {
+        debug!("handler->gui: {:?}", text);
+        glib::Continue(true)
+    });
+
+    application.run(&[]);
 }

@@ -71,7 +71,7 @@ nodes:
     "#,
     )?;
 
-    println!("{:?}", config);
+    debug!("Using config:\n{:?}", config);
 
     Ok(config)
 }
