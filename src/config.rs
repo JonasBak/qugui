@@ -63,6 +63,7 @@ pub struct Config {
     pub title: String,
     pub nodes: Vec<Node>,
     pub layout: ConfigLayout,
+    pub initialize: Option<Vec<Action>>,
 }
 
 pub fn read_config(filename: &String) -> Result<Config, serde_yaml::Error> {

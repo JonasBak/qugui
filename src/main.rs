@@ -22,6 +22,7 @@ use config::*;
 
 #[derive(Debug)]
 enum MsgHandler {
+    Initialize,
     Action(usize),
     Var(String, String),
 }
@@ -43,24 +44,27 @@ fn create_radio_buttons(
     tx: mpsc::Sender<MsgHandler>,
 ) -> gtk::Widget {
     let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let mut group: Option<RadioButton> = None;
+    let mut group: Option<(String, RadioButton)> = None;
     for (value, label) in btns.iter() {
         let button = RadioButton::new_with_label(label);
         let tx = tx.clone();
-        let value = value.clone().to_owned();
-        let variable = var.clone();
+        let value_clone = value.clone().to_owned();
+        let var = var.clone();
         button.connect_toggled(move |btn| {
             if btn.get_active() {
-                tx.send(MsgHandler::Var(variable.clone(), value.clone()))
+                tx.send(MsgHandler::Var(var.clone(), value_clone.clone()))
                     .unwrap();
             }
         });
         container.pack_start(&button, false, false, 0);
-        if let Some(group) = group.clone() {
+        if let Some((_, group)) = group.clone() {
             button.join_group(Some(&group));
         } else {
-            group = Some(button.clone());
+            group = Some((value.clone().to_owned(), button.clone()));
         }
+    }
+    if let Some((value, _)) = group.clone() {
+        tx.send(MsgHandler::Var(var, value.clone())).unwrap();
     }
     container.upcast::<gtk::Widget>()
 }
@@ -137,6 +141,7 @@ fn setup_gui(
         Layout::Grid(container) => window.add(&container.upcast::<gtk::Widget>()),
     };
 
+    let tx2 = tx.clone();
     grx.attach(None, move |msg| {
         debug!("handler->gui: {:?}", msg);
         match msg {
@@ -162,7 +167,7 @@ fn setup_gui(
                     let buttons = create_radio_buttons(
                         options.iter().map(|(a, b)| (a, b)).collect(),
                         variable,
-                        tx.clone(),
+                        tx2.clone(),
                     );
                     container.add(&buttons);
                     container.show_all();
@@ -175,6 +180,7 @@ fn setup_gui(
     });
 
     window.show_all();
+    tx.send(MsgHandler::Initialize).unwrap();
 }
 
 fn handle_msg(
@@ -195,6 +201,7 @@ fn handle_msg(
             env::set_var(var, value);
             None
         }
+        MsgHandler::Initialize => config.initialize.as_ref(),
     };
     if let Some(actions) = actions {
         let mut last_out = None;

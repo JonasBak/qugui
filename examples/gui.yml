@@ -2,6 +2,12 @@
 title: Example
 layout:
   Grid:
+initialize:
+- type: Run
+  command: ["git", "ls-files"]
+- type: Options
+  variable: $FILE$
+  container: container01
 nodes:
 - type: RadioButtons
   variable: $RADIO_VAR$
