@@ -21,6 +21,10 @@ nodes:
   on_click:
   - type: Run
     command: ["date"]
+  - type: Var
+    name: $SOME_VARIABLE$
+  - type: Run
+    command: ["echo", "Testing variable substitution: $SOME_VARIABLE$ some more text"]
   - type: Show
     container: container01
   placement:

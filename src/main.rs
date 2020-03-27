@@ -122,45 +122,66 @@ fn setup_gui(
     window.show_all();
 }
 
-fn handle_msg(config: &Config, msg: MsgHandler, gtx: glib::Sender<MsgGui>) {
+fn handle_msg(
+    config: &Config,
+    vars: &mut HashMap<String, String>,
+    msg: MsgHandler,
+    gtx: glib::Sender<MsgGui>,
+) {
     debug!("gui->handler: {:?}", msg);
-    match msg {
-        MsgHandler::Action(i) => {
-            let actions = match &config.nodes[i] {
-                Node::Button(btn) => Some(&btn.on_click),
-                Node::Container(_) => None,
-            };
-            if let Some(actions) = actions {
-                let mut last_out = None;
-                for action in actions.iter() {
-                    match action {
-                        Action::Run { command } => {
-                            let mut child = Command::new(&command[0])
-                                .args(command.iter().skip(1))
-                                .stdin(match last_out.take() {
-                                    Some(child_stdout) => Stdio::from(child_stdout),
-                                    None => Stdio::piped(),
-                                })
-                                .stdout(Stdio::piped())
-                                .spawn()
-                                .unwrap();
-                            last_out = child.stdout.take();
-                        }
-                        Action::Show { container } => {
-                            if let Some(mut stdout) = last_out.take() {
-                                let mut string = String::new();
-                                stdout.read_to_string(&mut string).unwrap();
-                                debug!("output from command:\n{}", string);
-                                gtx.send(MsgGui::Show(container.clone(), string)).unwrap();
-                            } else {
-                                warn!("can't show output, no stdout saved");
+    let actions = match msg {
+        MsgHandler::Action(i) => match &config.nodes[i] {
+            Node::Button(btn) => Some(&btn.on_click),
+            Node::Container(_) => None,
+        },
+    };
+    if let Some(actions) = actions {
+        let mut last_out = None;
+        for action in actions.iter() {
+            match action {
+                Action::Run { command } => {
+                    let mut child = Command::new(&command[0])
+                        .args(command.iter().skip(1).map(|arg| {
+                            let mut arg = arg.clone();
+                            for (key, value) in vars.iter() {
+                                arg = arg.replace(key, value);
                             }
-                        }
+                            arg
+                        }))
+                        .stdin(match last_out.take() {
+                            Some(child_stdout) => Stdio::from(child_stdout),
+                            None => Stdio::piped(),
+                        })
+                        .stdout(Stdio::piped())
+                        .spawn()
+                        .unwrap();
+                    last_out = child.stdout.take();
+                }
+                Action::Show { container } => {
+                    if let Some(mut stdout) = last_out.take() {
+                        let mut string = String::new();
+                        stdout.read_to_string(&mut string).unwrap();
+                        gtx.send(MsgGui::Show(container.clone(), string)).unwrap();
+                    } else {
+                        warn!("can't show output, no stdout saved");
+                    }
+                }
+                Action::Var { name, value } => {
+                    if let Some(value) = value {
+                        vars.insert(name.clone(), value.clone());
+                        env::set_var(name, value);
+                    } else if let Some(mut stdout) = last_out.take() {
+                        let mut string = String::new();
+                        stdout.read_to_string(&mut string).unwrap();
+                        vars.insert(name.clone(), string.clone());
+                        env::set_var(name, string);
+                    } else {
+                        warn!("can't show output, no stdout saved");
                     }
                 }
             }
         }
-    };
+    }
 }
 
 fn main() {
@@ -178,8 +199,9 @@ fn main() {
 
         let config_clone = config.clone();
         thread::spawn(move || {
+            let mut vars = HashMap::new();
             rx.iter()
-                .for_each(|msg| handle_msg(&config_clone, msg, gtx.clone()));
+                .for_each(|msg| handle_msg(&config_clone, &mut vars, msg, gtx.clone()));
         });
 
         setup_gui(tx.clone(), grx, &config, app);

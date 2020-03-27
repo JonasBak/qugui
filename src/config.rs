@@ -6,6 +6,7 @@ use std::fs;
 pub enum Action {
     Run { command: Vec<String> },
     Show { container: String },
+    Var { name: String, value: Option<String> },
 }
 
 // #[serde(tag = "type")]
