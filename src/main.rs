@@ -140,6 +140,25 @@ fn setup_gui(
                 containers.insert(cont.name.clone(), container);
                 (w, &cont.placement)
             }
+            Node::Input(inp) => {
+                let input = gtk::Entry::new();
+                tx.send(MsgHandler::Var {
+                    variable: inp.variable.clone(),
+                    value: "".to_string(),
+                })
+                .unwrap();
+                let tx = tx.clone();
+                let variable = inp.variable.clone();
+                input.connect_changed(move |input| {
+                    tx.send(MsgHandler::Var {
+                        variable: variable.clone(),
+                        value: input.get_buffer().get_text(),
+                    })
+                    .unwrap();
+                });
+
+                (input.upcast::<gtk::Widget>(), &inp.placement)
+            }
         };
         match &layout {
             Layout::Box(container) => {
@@ -241,6 +260,7 @@ fn handle_msg(
             Node::Button(btn) => Some(&btn.on_click),
             Node::RadioButtons(_) => None,
             Node::Container(_) => None,
+            Node::Input(_) => None,
         },
         MsgHandler::Var { variable, value } => {
             vars.insert(variable.clone(), value.clone());

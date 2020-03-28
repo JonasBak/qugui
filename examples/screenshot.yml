@@ -14,14 +14,30 @@ initialize:
   command: ["mktemp", "--suffix", ".png"]
 - type: Var
   name: $FILE$
+- type: Var
+  name: $PICTURES_FOLDER$
+  value: /home/jonasbak/Pictures/
 nodes:
 - type: Container
   name: select-container
   placement:
     x: 0
     y: 0
-    w: 3
+    w: 4
     h: 5
+- type: Input
+  variable: $SAVE_TO$
+  placement:
+    y: 5
+    w: 3
+- type: Button
+  text: Save
+  on_click:
+  - type: Run
+    command: ["mv", "$FILE$", "$PICTURES_FOLDER$$SAVE_TO$"]
+  placement:
+    x: 3
+    y: 5
 - type: Button
   text: Take screenshot
   on_click:
@@ -38,5 +54,5 @@ nodes:
     container: select-container
   placement:
     x: 0
-    y: 5
-    w: 3
+    y: 6
+    w: 4

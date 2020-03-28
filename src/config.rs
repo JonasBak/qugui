@@ -12,8 +12,6 @@ pub enum Action {
     Image { variable: String, container: String },
 }
 
-// #[serde(tag = "type")]
-// Sould maybe be enum, but it's gonna be bad either way
 #[derive(Debug, Clone, Deserialize)]
 pub struct Placement {
     pub spacing: Option<u32>,
@@ -38,6 +36,12 @@ pub struct RadioButtonsNode {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct InputNode {
+    pub variable: String,
+    pub placement: Placement,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct ContainerNode {
     pub name: String,
     pub placement: Placement,
@@ -49,6 +53,7 @@ pub enum Node {
     Button(ButtonNode),
     RadioButtons(RadioButtonsNode),
     Container(ContainerNode),
+    Input(InputNode),
 }
 
 // TODO check "bug" where spacing is left out and program panics
