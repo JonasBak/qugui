@@ -1,3 +1,4 @@
+extern crate gdk_pixbuf;
 extern crate gio;
 extern crate glib;
 extern crate gtk;
@@ -24,13 +25,24 @@ use config::*;
 enum MsgHandler {
     Initialize,
     Action(usize),
-    Var(String, String),
+    Var { variable: String, value: String },
 }
 
 #[derive(Debug)]
 enum MsgGui {
-    Show(String, String),
-    Options(String, String, Vec<(String, String)>),
+    Show {
+        container: String,
+        text: String,
+    },
+    Options {
+        container: String,
+        variable: String,
+        options: Vec<(String, String)>,
+    },
+    Image {
+        container: String,
+        filename: String,
+    },
 }
 
 enum Layout {
@@ -52,8 +64,11 @@ fn create_radio_buttons(
         let var = var.clone();
         button.connect_toggled(move |btn| {
             if btn.get_active() {
-                tx.send(MsgHandler::Var(var.clone(), value_clone.clone()))
-                    .unwrap();
+                tx.send(MsgHandler::Var {
+                    variable: var.clone(),
+                    value: value_clone.clone(),
+                })
+                .unwrap();
             }
         });
         container.pack_start(&button, false, false, 0);
@@ -64,7 +79,11 @@ fn create_radio_buttons(
         }
     }
     if let Some((value, _)) = group.clone() {
-        tx.send(MsgHandler::Var(var, value.clone())).unwrap();
+        tx.send(MsgHandler::Var {
+            variable: var,
+            value: value.clone(),
+        })
+        .unwrap();
     }
     container.upcast::<gtk::Widget>()
 }
@@ -145,7 +164,7 @@ fn setup_gui(
     grx.attach(None, move |msg| {
         debug!("handler->gui: {:?}", msg);
         match msg {
-            MsgGui::Show(container, text) => {
+            MsgGui::Show { container, text } => {
                 if let Some(container) = containers.get(&container) {
                     container
                         .get_children()
@@ -158,7 +177,11 @@ fn setup_gui(
                     warn!("could not find container with name {}", container);
                 }
             }
-            MsgGui::Options(container, variable, options) => {
+            MsgGui::Options {
+                container,
+                variable,
+                options,
+            } => {
                 if let Some(container) = containers.get(&container) {
                     container
                         .get_children()
@@ -170,6 +193,29 @@ fn setup_gui(
                         tx2.clone(),
                     );
                     container.add(&buttons);
+                    container.show_all();
+                } else {
+                    warn!("could not find container with name {}", container);
+                }
+            }
+            MsgGui::Image {
+                container,
+                filename,
+            } => {
+                if let Some(container) = containers.get(&container) {
+                    container
+                        .get_children()
+                        .iter()
+                        .for_each(|w| container.remove(w));
+                    let pixbuf = gdk_pixbuf::Pixbuf::new_from_file_at_scale(
+                        &filename,
+                        container.get_allocated_width(),
+                        container.get_allocated_height(),
+                        true,
+                    )
+                    .unwrap();
+                    let image = gtk::Image::new_from_pixbuf(Some(&pixbuf));
+                    container.add(&image);
                     container.show_all();
                 } else {
                     warn!("could not find container with name {}", container);
@@ -196,9 +242,9 @@ fn handle_msg(
             Node::RadioButtons(_) => None,
             Node::Container(_) => None,
         },
-        MsgHandler::Var(var, value) => {
-            vars.insert(var.clone(), value.clone());
-            env::set_var(var, value);
+        MsgHandler::Var { variable, value } => {
+            vars.insert(variable.clone(), value.clone());
+            env::set_var(variable, value);
             None
         }
         MsgHandler::Initialize => config.initialize.as_ref(),
@@ -223,13 +269,18 @@ fn handle_msg(
                         .stdout(Stdio::piped())
                         .spawn()
                         .unwrap();
+                    child.wait().unwrap();
                     last_out = child.stdout.take();
                 }
                 Action::Show { container } => {
                     if let Some(mut stdout) = last_out.take() {
-                        let mut string = String::new();
-                        stdout.read_to_string(&mut string).unwrap();
-                        gtx.send(MsgGui::Show(container.clone(), string)).unwrap();
+                        let mut text = String::new();
+                        stdout.read_to_string(&mut text).unwrap();
+                        gtx.send(MsgGui::Show {
+                            container: container.clone(),
+                            text,
+                        })
+                        .unwrap();
                     } else {
                         warn!("can't show output, no stdout saved");
                     }
@@ -241,6 +292,9 @@ fn handle_msg(
                     } else if let Some(mut stdout) = last_out.take() {
                         let mut string = String::new();
                         stdout.read_to_string(&mut string).unwrap();
+                        if string.ends_with("\n") {
+                            string.pop();
+                        }
                         vars.insert(name.clone(), string.clone());
                         env::set_var(name, string);
                     } else {
@@ -255,14 +309,28 @@ fn handle_msg(
                         let mut string = String::new();
                         stdout.read_to_string(&mut string).unwrap();
                         let lines = string.lines();
-                        gtx.send(MsgGui::Options(
-                            container.clone(),
-                            variable.to_owned(),
-                            lines.map(|a| (a.to_string(), a.to_string())).collect(),
-                        ))
+                        gtx.send(MsgGui::Options {
+                            container: container.clone(),
+                            variable: variable.to_owned(),
+                            options: lines.map(|a| (a.to_string(), a.to_string())).collect(),
+                        })
                         .unwrap();
                     } else {
                         warn!("can't create options, no stdout saved");
+                    }
+                }
+                Action::Image {
+                    variable,
+                    container,
+                } => {
+                    if let Some(value) = vars.get(variable) {
+                        gtx.send(MsgGui::Image {
+                            container: container.clone(),
+                            filename: value.clone(),
+                        })
+                        .unwrap();
+                    } else {
+                        warn!("variable {} not set", variable);
                     }
                 }
             }

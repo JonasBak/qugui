@@ -1,0 +1,42 @@
+---
+title: Screenshot
+layout:
+  Grid:
+initialize:
+- type: Run
+  command: ["swaymsg", "-t", "get_tree"]
+- type: Run
+  command: ["jq", "-r", '.. | select(.pid? and .visible?) | "\(.rect.x),\(.rect.y) \(.rect.width)x\(.rect.height) (\(.name))"']
+- type: Options
+  variable: $WINDOW$
+  container: select-container
+- type: Run
+  command: ["mktemp", "--suffix", ".png"]
+- type: Var
+  name: $FILE$
+nodes:
+- type: Container
+  name: select-container
+  placement:
+    x: 0
+    y: 0
+    w: 3
+    h: 5
+- type: Button
+  text: Take screenshot
+  on_click:
+  - type: Run
+    command: ["echo", "-n", "$WINDOW$"]
+  - type: Run
+    command: ["cut", "-d", " ", "-f", "1,2", "--output-delimiter", " "]
+  - type: Var
+    name: $REGION$
+  - type: Run
+    command: ["grim", "-g", "$REGION$", "$FILE$"]
+  - type: Image
+    variable: $FILE$
+    container: select-container
+  placement:
+    x: 0
+    y: 5
+    w: 3

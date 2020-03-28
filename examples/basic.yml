@@ -1,7 +1,8 @@
 ---
 title: Example
 layout:
-  Grid:
+  Vertical:
+    spacing: 0
 initialize:
 - type: Run
   command: ["git", "ls-files"]
@@ -9,16 +10,10 @@ initialize:
   variable: $FILE$
   container: container01
 nodes:
-- type: RadioButtons
-  variable: $RADIO_VAR$
-  options:
-    OPTION0: Option 0
-    OPTION1: Option 1
-    OPTION2: Option 2
+- type: Container
+  name: container01
   placement:
-    x: 0
-    y: 3
-    w: 3
+    spacing: 0
 - type: Button
   text: Rust diff
   on_click:
@@ -33,9 +28,7 @@ nodes:
   - type: Show
     container: container01
   placement:
-    x: 0
-    y: 4
-    w: 3
+    spacing: 0
 - type: Button
   text: List files
   on_click:
@@ -45,13 +38,12 @@ nodes:
     variable: $FILE$
     container: container01
   placement:
-    x: 0
-    y: 5
-    w: 3
-- type: Container
-  name: container01
+    spacing: 0
+- type: RadioButtons
+  variable: $RADIO_VAR$
+  options:
+    OPTION0: Option 0
+    OPTION1: Option 1
+    OPTION2: Option 2
   placement:
-    x: 0
-    y: 0
-    w: 3
-    h: 3
+    spacing: 0

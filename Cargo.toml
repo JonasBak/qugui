@@ -15,11 +15,4 @@ gtk = "0.8"
 gio = "0.8"
 log = "0.4"
 env_logger = "0.7"
-
-# [dependencies.gtk]
-# version = "0.8"
-# features = ["v3_16"]
-
-# [dependencies.gio]
-# version = ""
-# features = ["v2_44"]
+gdk-pixbuf = "0.8"

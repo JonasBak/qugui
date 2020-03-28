@@ -9,6 +9,7 @@ pub enum Action {
     Show { container: String },
     Var { name: String, value: Option<String> },
     Options { variable: String, container: String },
+    Image { variable: String, container: String },
 }
 
 // #[serde(tag = "type")]
