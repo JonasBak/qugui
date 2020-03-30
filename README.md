@@ -48,6 +48,8 @@ on_click:
 - Action1 # see Action
 - Action2
 placement: # see Placement
+# Will be grayed out if this condition is not met
+active_when: # see Conditions
 
 # Radio buttons
 type: RadioButtons
@@ -64,6 +66,13 @@ type: Container
 # Name of the container, used when referencing the container later
 name: container01
 placement: # see Placement
+
+# Text input field
+type: Input
+# Variable to put the text in
+variable: VARIABLE_NAME
+# Will be grayed out if this condition is not met
+active_when: # see Conditions
 ```
 #### Placement
 ```yml
@@ -112,3 +121,10 @@ container: container_name
 Other than the places listed, there are two ways variables affect the program:
 1. When a variable is set, it sets an environment variable with the same name and value
 2. Instances of the variable name is substituted for the value in commands in run actions
+#### Conditions
+```yml
+# Map of variable: value
+VARIABLE: something
+# If variable name is suffixed with !, it will be negated
+VARIABLE!: something
+```
