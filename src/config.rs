@@ -2,6 +2,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
+pub type Condition = HashMap<String, String>;
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type")]
 pub enum Action {
@@ -26,6 +28,7 @@ pub struct ButtonNode {
     pub text: String,
     pub on_click: Vec<Action>,
     pub placement: Placement,
+    pub active_when: Option<Condition>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -39,6 +42,7 @@ pub struct RadioButtonsNode {
 pub struct InputNode {
     pub variable: String,
     pub placement: Placement,
+    pub active_when: Option<Condition>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

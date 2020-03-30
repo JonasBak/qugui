@@ -38,8 +38,10 @@ fn main() {
         let config_clone = config.clone();
         thread::spawn(move || {
             let mut vars = HashMap::new();
-            rx.iter()
-                .for_each(|msg| handle_msg(&config_clone, &mut vars, msg, gtx.clone()));
+            let conditional_map = map_conditionals(&config_clone);
+            rx.iter().for_each(|msg| {
+                handle_msg(&config_clone, &mut vars, &conditional_map, msg, gtx.clone())
+            });
         });
 
         setup_gui(tx.clone(), grx, &config, app);

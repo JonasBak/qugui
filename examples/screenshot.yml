@@ -17,6 +17,9 @@ initialize:
 - type: Var
   name: $PICTURES_FOLDER$
   value: /home/jonasbak/Pictures/
+- type: Var
+  name: $TAKEN_SCREENSHOT$
+  value: no
 nodes:
 - type: Container
   name: select-container
@@ -30,16 +33,23 @@ nodes:
   placement:
     y: 5
     w: 3
+  active_when:
+    $TAKEN_SCREENSHOT$: yes
 - type: Button
   text: Save
   on_click:
   - type: Run
     command: ["mv", "$FILE$", "$PICTURES_FOLDER$$SAVE_TO$"]
+  active_when:
+    $SAVE_TO$!: ""
+    $TAKEN_SCREENSHOT$: yes
   placement:
     x: 3
     y: 5
 - type: Button
   text: Take screenshot
+  active_when:
+    $TAKEN_SCREENSHOT$: no
   on_click:
   - type: Run
     command: ["echo", "-n", "$WINDOW$"]
@@ -52,6 +62,9 @@ nodes:
   - type: Image
     variable: $FILE$
     container: select-container
+  - type: Var
+    name: $TAKEN_SCREENSHOT$
+    value: yes
   placement:
     x: 0
     y: 6

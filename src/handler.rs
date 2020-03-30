@@ -1,9 +1,11 @@
 use super::config::*;
 use super::gui::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::prelude::*;
 use std::process::{Command, Stdio};
+
+type Vars = HashMap<String, String>;
 
 #[derive(Debug)]
 pub enum MsgHandler {
@@ -12,13 +14,59 @@ pub enum MsgHandler {
     Var { variable: String, value: String },
 }
 
+fn check_condition(condition: &Condition, vars: &Vars) -> bool {
+    for (var, value) in condition.iter() {
+        let (var, negate) = if var.ends_with("!") {
+            (&var[..var.len() - 1], true)
+        } else {
+            (&var[..], false)
+        };
+        if match vars.get(var) {
+            Some(set_value) => (value != set_value) ^ negate,
+            None => !negate,
+        } {
+            return false;
+        };
+    }
+    true
+}
+
+pub fn map_conditionals(config: &Config) -> HashMap<String, Vec<usize>> {
+    let mut conditionals: HashMap<String, Vec<usize>> = HashMap::new();
+    for (i, node) in config.nodes.iter().enumerate() {
+        let condition = match node {
+            Node::Button(btn) => btn.active_when.as_ref(),
+            Node::RadioButtons(_) => None,
+            Node::Container(_) => None,
+            Node::Input(inp) => inp.active_when.as_ref(),
+        };
+        if let Some(condition) = condition {
+            for (var, _) in condition.iter() {
+                let mut var = var.clone();
+                if var.ends_with("!") {
+                    var.pop();
+                };
+                let mut v = match conditionals.remove(&var) {
+                    Some(v) => v,
+                    None => vec![],
+                };
+                v.push(i);
+                conditionals.insert(var, v);
+            }
+        }
+    }
+    conditionals
+}
+
 pub fn handle_msg(
     config: &Config,
-    vars: &mut HashMap<String, String>,
+    vars: &mut Vars,
+    conditionals: &HashMap<String, Vec<usize>>,
     msg: MsgHandler,
     gtx: glib::Sender<MsgGui>,
 ) {
     debug!("gui->handler: {:?}", msg);
+    let mut conditionals_set = HashSet::new();
     let actions = match msg {
         MsgHandler::Action(i) => match &config.nodes[i] {
             Node::Button(btn) => Some(&btn.on_click),
@@ -27,6 +75,11 @@ pub fn handle_msg(
             Node::Input(_) => None,
         },
         MsgHandler::Var { variable, value } => {
+            if let Some(nodes) = conditionals.get(&variable) {
+                nodes.iter().for_each(|i| {
+                    conditionals_set.insert(i.clone());
+                });
+            }
             vars.insert(variable.clone(), value.clone());
             env::set_var(variable, value);
             None
@@ -91,6 +144,11 @@ pub fn handle_msg(
                     }
                 }
                 Action::Var { name, value } => {
+                    if let Some(nodes) = conditionals.get(name) {
+                        nodes.iter().for_each(|i| {
+                            conditionals_set.insert(i.clone());
+                        });
+                    }
                     if let Some(value) = value {
                         vars.insert(name.clone(), value.clone());
                         env::set_var(name, value);
@@ -139,6 +197,21 @@ pub fn handle_msg(
                     }
                 }
             }
+        }
+    }
+    for i in conditionals_set.into_iter() {
+        let condition = match &config.nodes[i] {
+            Node::Button(btn) => btn.active_when.as_ref(),
+            Node::RadioButtons(_) => None,
+            Node::Container(_) => None,
+            Node::Input(inp) => inp.active_when.as_ref(),
+        };
+        if let Some(condition) = condition {
+            gtx.send(MsgGui::SetActive {
+                node: i,
+                active: check_condition(condition, vars),
+            })
+            .unwrap();
         }
     }
 }

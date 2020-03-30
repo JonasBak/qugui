@@ -20,6 +20,10 @@ pub enum MsgGui {
         container: String,
         filename: String,
     },
+    SetActive {
+        node: usize,
+        active: bool,
+    },
 }
 
 enum Layout {
@@ -76,6 +80,7 @@ pub fn setup_gui(
     window.set_default_size(600, 600);
 
     let mut containers = HashMap::new();
+    let mut conditionals = HashMap::new();
 
     let layout = match config.layout {
         ConfigLayout::Vertical { spacing } => Layout::Box(gtk::Box::new(
@@ -101,6 +106,9 @@ pub fn setup_gui(
                 button.connect_clicked(move |_| {
                     tx.send(MsgHandler::Action(i)).unwrap();
                 });
+                if btn.active_when.is_some() {
+                    conditionals.insert(i, button.clone().upcast::<gtk::Widget>());
+                }
                 (button.upcast::<gtk::Widget>(), &btn.placement)
             }
             Node::RadioButtons(btns) => {
@@ -133,6 +141,9 @@ pub fn setup_gui(
                     })
                     .unwrap();
                 });
+                if inp.active_when.is_some() {
+                    conditionals.insert(i, input.clone().upcast::<gtk::Widget>());
+                }
 
                 (input.upcast::<gtk::Widget>(), &inp.placement)
             }
@@ -215,6 +226,16 @@ pub fn setup_gui(
                     container.show_all();
                 } else {
                     warn!("could not find container with name {}", container);
+                }
+            }
+            MsgGui::SetActive { node, active } => {
+                if let Some(node) = conditionals.get(&node) {
+                    node.set_sensitive(active);
+                } else {
+                    warn!(
+                        "could not find node with index {} in conditionals map",
+                        node
+                    );
                 }
             }
         }
