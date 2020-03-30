@@ -71,6 +71,8 @@ pub enum ConfigLayout {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub title: String,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
     pub nodes: Vec<Node>,
     pub layout: ConfigLayout,
     pub initialize: Option<Vec<Action>>,

@@ -77,7 +77,7 @@ pub fn setup_gui(
 ) {
     let window = ApplicationWindow::new(app);
     window.set_title(&config.title);
-    window.set_default_size(600, 600);
+    window.set_default_size(config.width.unwrap_or(600), config.height.unwrap_or(600));
 
     let mut containers = HashMap::new();
     let mut conditionals = HashMap::new();

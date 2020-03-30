@@ -1,5 +1,7 @@
 ---
 title: Screenshot
+width: 400
+height: 300
 layout:
   Grid:
 initialize:
@@ -26,13 +28,14 @@ nodes:
   placement:
     x: 0
     y: 0
-    w: 4
-    h: 5
+    w: 7
+    h: 8
 - type: Input
   variable: $SAVE_TO$
   placement:
-    y: 5
-    w: 3
+    x: 7
+    y: 4
+    w: 2
   active_when:
     $TAKEN_SCREENSHOT$: yes
 - type: Button
@@ -44,8 +47,8 @@ nodes:
     $SAVE_TO$!: ""
     $TAKEN_SCREENSHOT$: yes
   placement:
-    x: 3
-    y: 5
+    x: 9
+    y: 4
 - type: Button
   text: Take screenshot
   active_when:
@@ -66,6 +69,6 @@ nodes:
     name: $TAKEN_SCREENSHOT$
     value: yes
   placement:
-    x: 0
-    y: 6
-    w: 4
+    x: 7
+    y: 3
+    w: 3
