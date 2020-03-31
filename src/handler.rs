@@ -121,6 +121,7 @@ pub fn handle_msg(
                                     command,
                                     status.code().unwrap_or(-1)
                                 );
+                                break;
                             }
                         }
                         Err(_) => {

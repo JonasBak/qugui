@@ -11,7 +11,7 @@
 #### `examples/basic.yml`
 An example that shows off some different features, but doesn't do anything useful.
 
-#### `examples/basic.yml`
+#### `examples/screenshot.yml`
 An actually useful example where [grim](https://github.com/emersion/grim) is given an ugly gui.
 
 ## Reference
